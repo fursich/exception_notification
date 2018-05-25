@@ -23,6 +23,13 @@ module ExceptionNotification
         end
       end
 
+      if options.key?(:ignore_notifier_if)
+        rack_ignore = options.delete(:ignore_notifier_if)
+        ExceptionNotifier.ignore_if do |exception, opts, notifier|
+          opts.key?(:env) && rack_ignore.call(opts[:env], exception, notifier)
+        end
+      end
+
       if options.key?(:ignore_crawlers)
         ignore_crawlers = options.delete(:ignore_crawlers)
         ExceptionNotifier.ignore_if do |exception, opts|

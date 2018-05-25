@@ -44,13 +44,15 @@ module ExceptionNotifier
 
     def notify_exception(exception, options={}, &block)
       return false if ignored_exception?(options[:ignore_exceptions], exception)
-      return false if ignored?(exception, options)
+      base_notifiers = options.delete(:notifiers) || notifiers
+      selected_notifiers = remove_ignored_notifiers(exception, options, *base_notifiers)
+      return false if selected_notifiers.empty?
+
       if error_grouping
         errors_count = group_error!(exception, options)
         return false unless send_notification?(exception, errors_count)
       end
 
-      selected_notifiers = options.delete(:notifiers) || notifiers
       [*selected_notifiers].each do |notifier|
         fire_notification(notifier, exception, options.dup, &block)
       end
@@ -85,6 +87,12 @@ module ExceptionNotifier
     #   ExceptionNotifier.ignore_if do |exception, options|
     #     not Rails.env.production?
     #   end
+    #
+    # Accepts notifier name (symbol) as the third argument to allow notifier specific condition:
+    #
+    #   ExceptionNotifier.ignore_if do |exception, options, notifier|
+    #     notifier == :slack_notifier && exception.is_a?(ActionController::InvalidAuthenticityToken)
+    #   end
     def ignore_if(&block)
       @@ignores << block
     end
@@ -94,13 +102,17 @@ module ExceptionNotifier
     end
 
     private
-    def ignored?(exception, options)
-      @@ignores.any?{ |condition| condition.call(exception, options) }
+    def ignored?(exception, options, notifier=nil)
+      @@ignores.any?{ |condition| condition.call(exception, options, notifier) }
     rescue Exception => e
       raise e if @@testing_mode
 
       logger.warn "An error occurred when evaluating an ignore condition. #{e.class}: #{e.message}\n#{e.backtrace.join("\n")}"
       false
+    end
+
+    def remove_ignored_notifiers(exception, options, *notifiers)
+      notifiers.reject{ |notifier| ignored?(exception, options, notifier) }
     end
 
     def ignored_exception?(ignore_array, exception)

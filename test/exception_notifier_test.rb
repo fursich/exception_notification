@@ -98,6 +98,44 @@ class ExceptionNotifierTest < ActiveSupport::TestCase
     ExceptionNotifier.clear_ignore_conditions!
   end
 
+  test "should allow specified notifiers to ignore exception if satisfies conditional ignore" do
+    class ErrorClass1 < StandardError; end
+    class ErrorClass2 < StandardError; end
+
+    notifier1_calls = 0
+    notifier1 = lambda { |exception, options| notifier1_calls += 1 }
+    ExceptionNotifier.register_exception_notifier(:notifier1, notifier1)
+
+    notifier2_calls = 0
+    notifier2 = lambda { |exception, options| notifier2_calls += 1 }
+    ExceptionNotifier.register_exception_notifier(:notifier2, notifier2)
+
+    ExceptionNotifier.ignore_if do |exception, options, notifier|
+      notifier == :notifier1 && exception.is_a?(ErrorClass1)
+    end
+
+    exception = ErrorClass1.new
+    ExceptionNotifier.notify_exception(exception)
+    assert_equal notifier1_calls, 0
+    assert_equal notifier2_calls, 1
+
+    exception = ErrorClass2.new
+    ExceptionNotifier.notify_exception(exception)
+    assert_equal notifier1_calls, 1
+    assert_equal notifier2_calls, 2
+
+    ExceptionNotifier.ignore_if do |exception, options, notifier|
+      notifier == :notifier2 && exception.is_a?(ErrorClass2)
+    end
+
+    exception = ErrorClass2.new
+    ExceptionNotifier.notify_exception(exception)
+    assert_equal notifier1_calls, 2
+    assert_equal notifier2_calls, 2
+
+    ExceptionNotifier.clear_ignore_conditions!
+  end
+
   test "should not send notification if one of ignored exceptions" do
     ExceptionNotifier.register_exception_notifier(:test, @test_notifier)
 
