@@ -41,4 +41,22 @@ class RackTest < ActiveSupport::TestCase
     ExceptionNotification::Rack.new(@normal_app, error_grouping: true).call({})
     assert_equal Rails.cache, ExceptionNotifier.error_grouping_cache
   end
+
+  test "should assign @@ignore_if when ignore_if is specified" do
+    ignore_if = -> (exception, options) { :condition_for_ignore_if }
+    ExceptionNotification::Rack.new(@normal_app, ignore_if: ignore_if).call({})
+
+    stored_lambda = ExceptionNotifier.class_variable_get(:@@ignores).last
+    assert_equal stored_lambda.call(StandardError, {env: {}}), :condition_for_ignore_if
+    ExceptionNotifier.clear_ignore_conditions!
+  end
+
+  test "should assign @@ignore_if when ignore_notifier_if is specified" do
+    ignore_notifier_if = -> (exception, options, notifier) { :condition_for_ignore_notifier_if }
+    ExceptionNotification::Rack.new(@normal_app, ignore_notifier_if: ignore_notifier_if).call({})
+
+    stored_lambda = ExceptionNotifier.class_variable_get(:@@ignores).last
+    assert_equal stored_lambda.call(StandardError, {env: {}}, :notifier), :condition_for_ignore_notifier_if
+    ExceptionNotifier.clear_ignore_conditions!
+  end
 end

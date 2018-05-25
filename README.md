@@ -859,12 +859,13 @@ Rails.application.config.middleware.use ExceptionNotification::Rack,
 
 You can choose to ignore certain exceptions, which will make ExceptionNotification avoid sending notifications for those specified. There are three ways of specifying which exceptions to ignore:
 
-* `:ignore_exceptions` - By exception class (i.e. ignore RecordNotFound ones)
+* `:ignore_exceptions`  - By exception class (i.e. ignore RecordNotFound ones)
 
-* `:ignore_crawlers`   - From crawler (i.e. ignore ones originated by Googlebot)
+* `:ignore_crawlers`    - From crawler (i.e. ignore ones originated by Googlebot)
 
-* `:ignore_if`         - Custom (i.e. ignore exceptions that satisfy some condition)
+* `:ignore_if`          - Custom (i.e. ignore exceptions that satisfy some condition)
 
+* `:ignore_notifier_if` - Custom (i.e. ignore exceptions for specified notifiers that satisfy some condition)
 
 ### :ignore_exceptions
 
@@ -904,7 +905,7 @@ Rails.application.config.middleware.use ExceptionNotification::Rack,
 
 *Lambda, default: nil*
 
-Last but not least, you can ignore exceptions based on a condition. Take a look:
+You can ignore exceptions based on a condition. Take a look:
 
 ```ruby
 Rails.application.config.middleware.use ExceptionNotification::Rack,
@@ -917,6 +918,30 @@ Rails.application.config.middleware.use ExceptionNotification::Rack,
 ```
 
 You can make use of both the environment and the exception inside the lambda to decide wether to avoid or not sending the notification.
+
+### :ignore_notifier_if
+
+*Lambda, default: nil*
+
+Furthermore, you can selectively ignore exceptions for specific notifiers based on a condition. Here's an example:
+
+```ruby
+Rails.application.config.middleware.use ExceptionNotification::Rack,
+  :ignore_notifier_if => ->(env, exception, notifier) {
+    exception.message =~ /^A Not-So-Important Yet Needs To Be Logged Exception/ && notifier == :slack_notifier
+  },
+  :email => {
+    :email_prefix         => "[PREFIX] ",
+    :sender_address       => %{"notifier" <notifier@example.com>},
+    :exception_recipients => %w{exceptions@example.com},
+  },
+  :slack => {
+    :webhook_url => "[Your webhook url]",
+    :channel => "#major_exceptions",
+  }
+```
+
+With this option you can selectively order specific notifier to ignore certain types of exceptions. In this case, you can use the environment, the exception, and the notifier name (as symbol) inside the lambda to decide whether or not to send the notification to each notifier.
 
 ## Rack X-Cascade Header
 
